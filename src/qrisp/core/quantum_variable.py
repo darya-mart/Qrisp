@@ -855,16 +855,17 @@ class QuantumVariable:
         self.size -= len(qubits)
 
     def get_measurement(
-        self,
-        plot=False,
-        backend=None,
-        shots=100000,
-        compile=True,
-        compilation_kwargs={},
-        subs_dic={},
-        circuit_preprocessor=None,
-        filename=None,
-        precompiled_qc = None
+            self,
+            plot=False,
+            backend=None,
+            shots=100000,
+            compile=True,
+            compilation_kwargs={},
+            subs_dic={},
+            circuit_preprocessor=None,
+            filename=None,
+            precompiled_qc=None,
+            batched: bool = False
     ):
         r"""
         Method for quick access to the measurement results of the state of the variable.
@@ -886,6 +887,7 @@ class QuantumVariable:
             should be called before. The default is True.
         compilation_kwargs  : dict, optional
             Keyword arguments for the compile method. For more details check
+            :param batched: True if the circuits should be executed in a batch
             :meth:`QuantumSession.compile <qrisp.QuantumSession.compile>`. The default
             is ``{}``.
         subs_dic : dict, optional
@@ -942,7 +944,7 @@ class QuantumVariable:
         if self.size == 0:
             return {"": 1.0}
 
-        if precompiled_qc is None:        
+        if precompiled_qc is None:
             if compile:
                 qc = qompiler(
                     self.qs, intended_measurements=self.reg, **compilation_kwargs
@@ -973,9 +975,30 @@ class QuantumVariable:
 
         from qrisp.misc import get_measurement_from_qc
 
-        counts = get_measurement_from_qc(qc, self.reg, backend, shots)
+        counts = get_measurement_from_qc(qc, self.reg, backend, shots, batched=batched)
+        if batched and not counts:
+            return None
 
-        # Insert outcome labels (if available and hashable)
+        else:
+         #   print("get measurement counts", counts)
+            # Insert outcome labels (if available and hashable)
+            if batched:
+                counts_batched = []
+                for c in counts:
+                    c = self.postprocess_counts(c)
+                    counts_batched.append(c)
+                counts = counts_batched
+                if plot:
+                    for i, c in enumerate(counts):
+                        self.plot_counts(c, f'{filename}_{i}')
+            else:
+                counts = self.postprocess_counts(counts)
+
+                if plot:
+                    self.plot_counts(counts, filename)
+            return counts
+
+    def postprocess_counts(self, counts):
         try:
             new_counts_dic = {}
 
@@ -1001,26 +1024,24 @@ class QuantumVariable:
             counts = counts_tuple_list
 
             counts.sorted(key=lambda x: x[1])
-
-        if plot:
-            outcome_labels = []
-            for i in range(2**self.size):
-                temp = self.decoder(i)
-                
-                try:
-                    hash(temp)
-                except TypeError:
-                    raise Exception(
-                        "Outcome value " + str(self.decoder(i)) + " is not hashable"
-                    )
-
-                outcome_labels.append(temp)
-
-            plot_histogram(outcome_labels, counts, filename)
-            plt.show()
-
-        # Return dictionary of measurement results
         return counts
+
+    def plot_counts(self, counts, filename):
+        outcome_labels = []
+        for i in range(2 ** self.size):
+            temp = self.decoder(i)
+
+            try:
+                hash(temp)
+            except TypeError:
+                raise Exception(
+                    "Outcome value " + str(self.decoder(i)) + " is not hashable"
+                )
+
+            outcome_labels.append(temp)
+
+        plot_histogram(outcome_labels, counts, filename)
+        plt.show()
 
     def most_likely(self, **kwargs):
         """

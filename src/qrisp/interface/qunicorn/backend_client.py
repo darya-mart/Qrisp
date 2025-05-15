@@ -221,7 +221,7 @@ class BackendClient:
         if job_post_response.status_code == 422:
             raise Exception(
                 f'Unprocessable job (status code: {job_post_response.status_code}, message: '
-                f'{job_post_response.json()["message"]})'
+                f'{job_post_response.json()})'
             )
         elif job_post_response.status_code != 201:
             raise Exception(
@@ -244,6 +244,7 @@ class BackendClient:
 
             job_state = job_get_response.json()["state"]
             if job_state == "ERROR":
+                print(job_get_response)
                 raise RuntimeError("Job has failed!")
 
             if job_state == "FINISHED":

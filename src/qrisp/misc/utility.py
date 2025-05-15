@@ -1276,7 +1276,7 @@ def check_if_fresh(qubits, qs, ignore_q_envs = True):
     return True
 
 
-def get_measurement_from_qc(qc, qubits, backend, shots=100000):
+def get_measurement_from_qc(qc, qubits, backend, shots=100000, batched=False):
     # Add classical registers for the measurement results to be stored in
     cl = []
     for i in range(len(qubits)):
@@ -1287,15 +1287,37 @@ def get_measurement_from_qc(qc, qubits, backend, shots=100000):
         qc.measure(qubits[i], cl[i])
 
     # Execute circuit
-    counts = backend.run(qc, shots)
-    
+    counts_result = backend.run(qc, shots)
+
     # Remove other measurements outcomes from counts dic
+
+    if batched and not counts_result:
+        return None
+    else:
+        if batched:
+            counts_batched = []
+            for count in counts_result:
+               # print("batched; counts_result", counts_result)
+              #  print("batched; count", count)
+                count = postprocess_counts(count, len(cl))
+                count = normalize_counts(count, shots)
+                counts_batched.append(count)
+            return counts_batched
+        else:
+         #   print("unbatched; counts_result", counts_result)
+            counts = postprocess_counts(counts_result, len(cl))
+            counts = normalize_counts(counts, shots)
+            return counts
+
+
+def postprocess_counts(counts, cl_register_length):
+  #  print("counts before postprocess", counts)
     new_counts_dic = {}
     for key in counts.keys():
         # Remove possible whitespaces
         new_key = key.replace(" ", "")
         # Remove other measurements
-        new_key = new_key[:len(cl)]
+        new_key = new_key[:cl_register_length]
 
         new_key = int(new_key, base=2)
         try:
@@ -1304,13 +1326,14 @@ def get_measurement_from_qc(qc, qubits, backend, shots=100000):
             new_counts_dic[new_key] = counts[key]
 
     counts = new_counts_dic
-    
-    # Plot result (if needed)
+    return counts
 
-    # Normalize counts
+
+def normalize_counts(counts, shots):
+    #print("normalize_counts counts", counts)
     for key in counts.keys():
         counts[key] = counts[key] / abs(shots)
-
+  #  print("normalize_counts counts", counts)
     return counts
 
 
@@ -1321,10 +1344,9 @@ def find_calling_line(level=0):
     )  # prints "a = fct1()"
 
 
-
 def retarget_instructions(data, source_qubits, target_qubits):
     from qrisp import QuantumEnvironment, recursive_qs_search, multi_session_merge
-    
+
     for i in range(len(data)):
         instr = data[i]
 
@@ -1336,6 +1358,7 @@ def retarget_instructions(data, source_qubits, target_qubits):
         for j in range(len(instr.qubits)):
             if instr.qubits[j] in source_qubits:
                 instr.qubits[j] = target_qubits[source_qubits.index(instr.qubits[j])]
+
 
 def redirect_qfunction(function_to_redirect):
     """
