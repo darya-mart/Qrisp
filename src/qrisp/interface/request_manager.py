@@ -1,6 +1,8 @@
 import requests
 from requests.auth import HTTPBasicAuth
 
+from qrisp.interface.qunicorn.token_manager import TokenManager
+
 
 class RequestManager:
     """
@@ -30,9 +32,10 @@ class RequestManager:
                 Closes the session and cleans up associated resources.
         """
 
-    def __init__(self, base_url: str, username: str = None, password: str = None):
+    def __init__(self, base_url: str, username: str = None, password: str = None, token_manager: TokenManager = None):
         self.base_url = base_url
         self.session = requests.Session()
+        self.token_manager = token_manager
         if username is not None and password is not None:
             self.set_credentials(username, password)
 
@@ -43,19 +46,31 @@ class RequestManager:
     def get(self, endpoint: str, **kwargs):
         """Execute GET request. """
         url = f"{self.base_url}{endpoint}"
-        response = self.session.get(url, **kwargs)
+        if self.token_manager:
+            headers = self.token_manager.get_auth_headers()
+            response = self.session.get(url, headers=headers, **kwargs)
+        else:
+            response = self.session.get(url, **kwargs)
         return response
 
     def post(self, endpoint: str, data=None, json=None, **kwargs):
         """Execute POST request. """
         url = f"{self.base_url}{endpoint}"
-        response = self.session.post(url, data=data, json=json, **kwargs)
+        if self.token_manager:
+            headers = self.token_manager.get_auth_headers()
+            response = self.session.post(url, data=data, json=json, headers=headers, **kwargs)
+        else:
+            response = self.session.post(url, data=data, json=json, **kwargs)
         return response
 
     def delete(self, endpoint: str, data=None, json=None, **kwargs):
         """Execute POST request. """
         url = f"{self.base_url}{endpoint}"
-        response = self.session.delete(url, data=data, json=json, **kwargs)
+        if self.token_manager:
+            headers = self.token_manager.get_auth_headers()
+            response = self.session.post(url, data=data, json=json, headers=headers, **kwargs)
+        else:
+            response = self.session.delete(url, data=data, json=json, **kwargs)
         return response
 
     def __enter__(self):

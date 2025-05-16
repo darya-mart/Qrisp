@@ -165,7 +165,7 @@ class BackendClient:
             res = self.circuit_batch
             self.circuit_batch = []
         else:
-            #print(
+            # print(
             #    f"Waiting for the batch, current batch size: {current_batch_length}, expected: {self.batch_size}")
             res = None
         return res
@@ -212,6 +212,7 @@ class BackendClient:
             "token": self.token,
             "type": "RUNNER",
             "deploymentId": deployment_id,
+            "cutToWidth": None # delete after qunicorn-planqk fix
         }
 
         job_post_response = self.request_manager.post(
